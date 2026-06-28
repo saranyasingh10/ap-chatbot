@@ -28,7 +28,8 @@
 
   /* Upload panel */
   .upload-panel { background: #fffdf2; border-bottom: 1px solid #e2e6ea;
-                  padding: 12px 14px; display: none; }
+                  padding: 12px 14px; display: none; max-height: 70vh;
+                  overflow-y: auto; }
   .upload-panel.open { display: block; }
   .upload-panel h4 { margin: 0 0 8px 0; font-size: 13px; color: #c8102e; }
   .drop-zone { border: 2px dashed #c0c4cc; border-radius: 8px;
@@ -37,18 +38,46 @@
   .drop-zone:hover, .drop-zone.dragover { border-color: #c8102e; background: #fff5f6; }
   .drop-zone input[type=file] { display: none; }
   .drop-zone-text { color: #666; font-size: 12px; }
-  .preview-wrap { margin-top: 10px; display: none; }
-  .preview-wrap.show { display: block; }
-  .preview-img { max-width: 100%; max-height: 180px; border-radius: 6px;
-                 display: block; margin: 0 auto 8px; }
-  .gps-row { display: flex; gap: 6px; margin: 8px 0; align-items: center; }
-  .gps-row label { font-size: 12px; color: #555; width: 38px; }
-  .gps-row input { flex: 1; padding: 5px 8px; border: 1px solid #d6dae0;
-                   border-radius: 4px; font-size: 12px; }
-  .gps-status { font-size: 11px; padding: 4px 8px; border-radius: 4px;
-                margin-bottom: 6px; }
-  .gps-status.found { background: #d4edda; color: #155724; }
-  .gps-status.missing { background: #fff3cd; color: #856404; }
+
+  /* Stage 1: review */
+  .review-panel { margin-top: 10px; display: none; }
+  .review-panel.show { display: block; }
+  .stats-bar { background: #fff; border: 1px solid #e2e6ea; border-radius: 4px;
+               padding: 8px 10px; font-size: 12px; margin-bottom: 8px; }
+  .stats-bar b { color: #c8102e; }
+
+  /* GPS-missing list */
+  .missing-gps-list { background: #fff3cd; border: 1px solid #ffeeba;
+                      border-radius: 4px; padding: 8px; margin-bottom: 8px; }
+  .missing-gps-list h5 { margin: 0 0 6px 0; font-size: 12px; color: #856404; }
+  .missing-row { display: flex; align-items: center; gap: 6px; padding: 4px 0;
+                 border-bottom: 1px solid #ffeeba; }
+  .missing-row:last-child { border-bottom: none; }
+  .missing-row img { width: 36px; height: 36px; object-fit: cover; border-radius: 3px; }
+  .missing-row .fname { flex: 0 0 110px; font-size: 11px; color: #555;
+                        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .missing-row input { width: 80px; padding: 3px 5px; border: 1px solid #d6dae0;
+                       border-radius: 3px; font-size: 11px; }
+  .missing-row input.invalid { border-color: #c00; background: #ffe6e6; }
+
+  /* Thumbnail grid */
+  .thumb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+                gap: 4px; margin-bottom: 8px; }
+  .thumb-cell { position: relative; aspect-ratio: 1; border: 1px solid #d6dae0;
+                border-radius: 3px; overflow: hidden; background: #fff; }
+  .thumb-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb-cell .remove-btn { position: absolute; top: 1px; right: 1px;
+                             width: 16px; height: 16px; border-radius: 50%;
+                             background: rgba(0,0,0,0.6); color: #fff; border: none;
+                             cursor: pointer; font-size: 10px; line-height: 14px;
+                             padding: 0; }
+  .thumb-cell .remove-btn:hover { background: #c00; }
+  .thumb-cell .gps-dot { position: absolute; bottom: 2px; left: 2px;
+                          width: 8px; height: 8px; border-radius: 50%; }
+  .thumb-cell .gps-dot.found { background: #0a7c0a; }
+  .thumb-cell .gps-dot.missing { background: #d97706; }
+
+  /* Actions */
   .upload-actions { display: flex; gap: 6px; margin-top: 8px; }
   .upload-actions button { flex: 1; padding: 7px 10px; border: none;
                             border-radius: 6px; cursor: pointer; font-size: 12px;
@@ -57,13 +86,31 @@
   .btn-primary:hover:not(:disabled) { background: #a00d24; }
   .btn-secondary { background: #f0f2f5; color: #333; border: 1px solid #d6dae0; }
   .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-  .progress-log { background: #f8f9fa; border: 1px solid #e2e6ea;
-                  border-radius: 4px; padding: 8px; margin-top: 8px;
-                  font-family: monospace; font-size: 11px; max-height: 120px;
-                  overflow-y: auto; display: none; }
-  .progress-log.show { display: block; }
-  .progress-log .ok { color: #0a7c0a; }
-  .progress-log .err { color: #c00; }
+
+  /* Stage 2: batch progress */
+  .batch-progress { margin-top: 10px; display: none; }
+  .batch-progress.show { display: block; }
+  .progress-bar-wrap { background: #e2e6ea; border-radius: 10px; overflow: hidden;
+                       height: 10px; margin-bottom: 8px; }
+  .progress-bar { height: 100%; background: #c8102e; transition: width .3s;
+                   width: 0%; }
+  .progress-text { font-size: 12px; color: #555; margin-bottom: 8px; font-weight: 500; }
+  .batch-log { background: #f8f9fa; border: 1px solid #e2e6ea; border-radius: 4px;
+                padding: 6px 8px; font-family: monospace; font-size: 11px;
+                max-height: 200px; overflow-y: auto; }
+  .batch-log .row { padding: 2px 0; }
+  .batch-log .ok { color: #0a7c0a; }
+  .batch-log .err { color: #c00; }
+  .batch-log .pending { color: #888; }
+  .batch-log .running { color: #c8102e; font-weight: 500; }
+
+  /* Stage 3: summary */
+  .batch-summary { margin-top: 10px; display: none; padding: 10px;
+                    background: #d4edda; border: 1px solid #c3e6cb;
+                    border-radius: 4px; font-size: 12px; }
+  .batch-summary.show { display: block; }
+  .batch-summary.has-errors { background: #fff3cd; border-color: #ffeeba; }
+  .batch-summary h5 { margin: 0 0 6px 0; font-size: 13px; }
 
   /* Messages area */
   .messages { flex: 1; overflow-y: auto; padding: 12px 14px; }
@@ -125,32 +172,38 @@
 
   <!-- Collapsible upload panel -->
   <div class="upload-panel" id="uploadPanel">
-    <h4>📤 Upload a new store photo for analysis</h4>
+    <h4>📤 Upload photos for analysis</h4>
     <label class="drop-zone" id="dropZone">
-      <input type="file" id="fileInput" accept="image/jpeg,image/png">
+      <input type="file" id="fileInput" accept="image/jpeg,image/png" multiple webkitdirectory directory>
       <div class="drop-zone-text">
-        📷 Drop a photo here or click to choose<br>
-        <small>(JPEG/PNG with GPS preferred)</small>
+        📷 Drop a folder or photos here, or click to choose<br>
+        <small>(JPEG/PNG · multiple files or whole folders supported · GPS in EXIF preferred)</small>
       </div>
     </label>
+    <div style="font-size:11px; color:#888; text-align:center; margin-top:4px;">
+      Folder picker not working? <a href="#" id="filesOnlyLink">Pick files instead</a>
+    </div>
 
-    <div class="preview-wrap" id="previewWrap">
-      <img class="preview-img" id="previewImg" alt="preview">
-
-      <div class="gps-status" id="gpsStatus"></div>
-      <div class="gps-row">
-        <label>Lat:</label>
-        <input type="number" step="0.0000001" id="latInput" placeholder="19.0825">
-        <label>Lon:</label>
-        <input type="number" step="0.0000001" id="lonInput" placeholder="72.8391">
-      </div>
-
+    <!-- Stage 1: Review selection -->
+    <div class="review-panel" id="reviewPanel">
+      <div class="stats-bar" id="statsBar"></div>
+      <div class="missing-gps-list" id="missingGpsList" style="display:none"></div>
+      <div class="thumb-grid" id="thumbGrid"></div>
       <div class="upload-actions">
         <button class="btn-secondary" id="cancelUpload">Cancel</button>
-        <button class="btn-primary" id="analyseBtn" disabled>Analyse & Add</button>
+        <button class="btn-primary" id="processBtn" disabled>Process photos →</button>
       </div>
-      <div class="progress-log" id="progressLog"></div>
     </div>
+
+    <!-- Stage 2: Batch progress -->
+    <div class="batch-progress" id="batchProgress">
+      <div class="progress-text" id="progressText">Processing…</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="batch-log" id="batchLog"></div>
+    </div>
+
+    <!-- Stage 3: Summary -->
+    <div class="batch-summary" id="batchSummary"></div>
   </div>
 
   <!-- Chat messages -->
@@ -197,30 +250,33 @@ const ANALYZE_PROXY_URL = "https://ap-analyze-proxy.saranyasingh10.workers.dev";
 /* ════════════════════════════════════════════════════════════════════════════ */
 
 /* ─── State ─── */
-let authToken = null;
-let username  = null;
-let pendingFile = null;
-let pendingGPS  = null;   // { lat, lon } or null
+let authToken    = null;
+let username     = null;
+let pendingItems = [];   // [{ file, exifLat, exifLon, manualLat, manualLon, hasGPS, thumbUrl, id }]
 
 /* ═══ DOM refs ═══ */
-const authBtn      = document.getElementById("authBtn");
-const uploadPanel  = document.getElementById("uploadPanel");
-const uploadPill   = document.getElementById("uploadPill");
-const dropZone     = document.getElementById("dropZone");
-const fileInput    = document.getElementById("fileInput");
-const previewWrap  = document.getElementById("previewWrap");
-const previewImg   = document.getElementById("previewImg");
-const gpsStatus    = document.getElementById("gpsStatus");
-const latInput     = document.getElementById("latInput");
-const lonInput     = document.getElementById("lonInput");
-const analyseBtn   = document.getElementById("analyseBtn");
-const cancelUpload = document.getElementById("cancelUpload");
-const progressLog  = document.getElementById("progressLog");
-const messagesEl   = document.getElementById("messages");
-const inputEl      = document.getElementById("userInput");
-const sendBtn      = document.getElementById("sendBtn");
-const modalEl      = document.getElementById("imgModal");
-const modalImg     = document.getElementById("modalImg");
+const authBtn        = document.getElementById("authBtn");
+const uploadPanel    = document.getElementById("uploadPanel");
+const uploadPill     = document.getElementById("uploadPill");
+const dropZone       = document.getElementById("dropZone");
+const fileInput      = document.getElementById("fileInput");
+const filesOnlyLink  = document.getElementById("filesOnlyLink");
+const reviewPanel    = document.getElementById("reviewPanel");
+const statsBar       = document.getElementById("statsBar");
+const missingGpsList = document.getElementById("missingGpsList");
+const thumbGrid      = document.getElementById("thumbGrid");
+const processBtn     = document.getElementById("processBtn");
+const cancelUpload   = document.getElementById("cancelUpload");
+const batchProgress  = document.getElementById("batchProgress");
+const progressBar    = document.getElementById("progressBar");
+const progressText   = document.getElementById("progressText");
+const batchLog       = document.getElementById("batchLog");
+const batchSummary   = document.getElementById("batchSummary");
+const messagesEl     = document.getElementById("messages");
+const inputEl        = document.getElementById("userInput");
+const sendBtn        = document.getElementById("sendBtn");
+const modalEl        = document.getElementById("imgModal");
+const modalImg       = document.getElementById("modalImg");
 
 /* ════════════════════════════════════════════════════════════════════════════
    OAuth — implicit flow with popup
@@ -296,132 +352,290 @@ uploadPill.addEventListener("click", () => {
   dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove("dragover"); })
 );
 dropZone.addEventListener("drop", e => {
-  const file = e.dataTransfer.files[0];
-  if (file) handleFile(file);
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
+  if (files.length) handleFiles(files);
 });
 fileInput.addEventListener("change", e => {
-  const file = e.target.files[0];
-  if (file) handleFile(file);
+  const files = Array.from(e.target.files).filter(f => f.type.startsWith("image/"));
+  if (files.length) handleFiles(files);
 });
 
-async function handleFile(file) {
-  if (!file.type.startsWith("image/")) {
-    alert("Please pick an image file.");
+// Toggle file picker mode between folder & multi-file
+filesOnlyLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (fileInput.hasAttribute("webkitdirectory")) {
+    fileInput.removeAttribute("webkitdirectory");
+    fileInput.removeAttribute("directory");
+    filesOnlyLink.textContent = "Pick folder instead";
+  } else {
+    fileInput.setAttribute("webkitdirectory", "");
+    fileInput.setAttribute("directory", "");
+    filesOnlyLink.textContent = "Pick files instead";
+  }
+  fileInput.value = "";
+  setTimeout(() => fileInput.click(), 50);
+});
+
+async function handleFiles(files) {
+  // Read EXIF for each file in parallel
+  pendingItems = await Promise.all(files.map(async (file, idx) => {
+    const item = {
+      id: `item_${Date.now()}_${idx}`,
+      file: file,
+      exifLat: null, exifLon: null,
+      manualLat: "", manualLon: "",
+      hasGPS: false,
+      thumbUrl: URL.createObjectURL(file)
+    };
+    try {
+      const exif = await exifr.gps(file);
+      if (exif && exif.latitude && exif.longitude) {
+        item.exifLat = exif.latitude;
+        item.exifLon = exif.longitude;
+        item.hasGPS  = true;
+      }
+    } catch {}
+    return item;
+  }));
+
+  renderReview();
+}
+
+function renderReview() {
+  if (pendingItems.length === 0) {
+    reviewPanel.classList.remove("show");
     return;
   }
-  pendingFile = file;
-  previewImg.src = URL.createObjectURL(file);
-  previewWrap.classList.add("show");
-  progressLog.classList.remove("show");
-  progressLog.innerHTML = "";
+  reviewPanel.classList.add("show");
+  batchProgress.classList.remove("show");
+  batchSummary.classList.remove("show");
 
-  // Try to extract GPS from EXIF
-  try {
-    const exif = await exifr.gps(file);
-    if (exif && exif.latitude && exif.longitude) {
-      pendingGPS = { lat: exif.latitude, lon: exif.longitude };
-      latInput.value = exif.latitude.toFixed(7);
-      lonInput.value = exif.longitude.toFixed(7);
-      gpsStatus.className = "gps-status found";
-      gpsStatus.textContent = `📍 GPS found: ${exif.latitude.toFixed(5)}, ${exif.longitude.toFixed(5)}`;
-    } else {
-      throw new Error("no gps");
-    }
-  } catch {
-    pendingGPS = null;
-    latInput.value = ""; lonInput.value = "";
-    gpsStatus.className = "gps-status missing";
-    gpsStatus.textContent = "⚠️ No GPS in photo — please enter lat/lon manually below.";
+  const withGPS    = pendingItems.filter(p => p.hasGPS).length;
+  const missingGPS = pendingItems.length - withGPS;
+
+  // Stats bar
+  statsBar.innerHTML =
+    `<b>${pendingItems.length}</b> file(s) selected · ` +
+    `<span style="color:#0a7c0a">${withGPS} with GPS</span> · ` +
+    (missingGPS > 0
+      ? `<span style="color:#d97706">${missingGPS} missing GPS</span>`
+      : `<span>all geotagged ✓</span>`);
+
+  // Missing GPS rows
+  const missingItems = pendingItems.filter(p => !p.hasGPS);
+  if (missingItems.length > 0) {
+    missingGpsList.style.display = "block";
+    missingGpsList.innerHTML =
+      `<h5>⚠️ ${missingItems.length} photo(s) need manual lat/lon:</h5>` +
+      missingItems.map(item => `
+        <div class="missing-row" data-id="${item.id}">
+          <img src="${item.thumbUrl}" alt="">
+          <span class="fname" title="${item.file.name}">${item.file.name}</span>
+          <input type="number" step="0.0000001" placeholder="Lat" data-axis="lat"
+                 value="${item.manualLat}">
+          <input type="number" step="0.0000001" placeholder="Lon" data-axis="lon"
+                 value="${item.manualLon}">
+        </div>
+      `).join("");
+
+    // Wire up the inputs to update state
+    missingGpsList.querySelectorAll("input").forEach(inp => {
+      inp.addEventListener("input", (e) => {
+        const row  = e.target.closest(".missing-row");
+        const id   = row.dataset.id;
+        const axis = e.target.dataset.axis;
+        const item = pendingItems.find(p => p.id === id);
+        if (!item) return;
+        if (axis === "lat") item.manualLat = e.target.value;
+        else                item.manualLon = e.target.value;
+
+        // Visual validation
+        const v = parseFloat(e.target.value);
+        const valid = !isNaN(v) &&
+                      (axis === "lat" ? (v >= -90 && v <= 90) : (v >= -180 && v <= 180));
+        e.target.classList.toggle("invalid", e.target.value !== "" && !valid);
+
+        updateProcessBtn();
+      });
+    });
+  } else {
+    missingGpsList.style.display = "none";
   }
-  updateAnalyseBtn();
+
+  // Thumbnail grid
+  thumbGrid.innerHTML = pendingItems.map(item => `
+    <div class="thumb-cell" data-id="${item.id}">
+      <img src="${item.thumbUrl}" alt="">
+      <button class="remove-btn" title="Remove">×</button>
+      <div class="gps-dot ${item.hasGPS ? 'found' : 'missing'}"
+           title="${item.hasGPS ? 'GPS found' : 'GPS missing'}"></div>
+    </div>
+  `).join("");
+
+  // Wire remove buttons
+  thumbGrid.querySelectorAll(".remove-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const id = e.target.closest(".thumb-cell").dataset.id;
+      pendingItems = pendingItems.filter(p => p.id !== id);
+      renderReview();
+    });
+  });
+
+  updateProcessBtn();
 }
 
-function updateAnalyseBtn() {
-  const lat = parseFloat(latInput.value);
-  const lon = parseFloat(lonInput.value);
-  const valid = !isNaN(lat) && !isNaN(lon) &&
-                lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
-  analyseBtn.disabled = !(pendingFile && valid);
+function getEffectiveCoords(item) {
+  if (item.hasGPS) return { lat: item.exifLat, lon: item.exifLon };
+  const lat = parseFloat(item.manualLat);
+  const lon = parseFloat(item.manualLon);
+  if (isNaN(lat) || isNaN(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
 }
-[latInput, lonInput].forEach(i => i.addEventListener("input", updateAnalyseBtn));
+
+function updateProcessBtn() {
+  const allValid = pendingItems.length > 0 &&
+                   pendingItems.every(item => getEffectiveCoords(item) !== null);
+  processBtn.disabled = !allValid;
+  processBtn.textContent = `Process ${pendingItems.length} photo${pendingItems.length === 1 ? "" : "s"} →`;
+}
 
 cancelUpload.addEventListener("click", () => {
-  pendingFile = null; pendingGPS = null;
-  previewWrap.classList.remove("show");
+  pendingItems.forEach(p => URL.revokeObjectURL(p.thumbUrl));
+  pendingItems = [];
+  reviewPanel.classList.remove("show");
+  batchProgress.classList.remove("show");
+  batchSummary.classList.remove("show");
   fileInput.value = "";
 });
 
 /* ════════════════════════════════════════════════════════════════════════════
-   Upload + Analyse + Append pipeline
+   Batch pipeline — sequential, with progress
    ══════════════════════════════════════════════════════════════════════════ */
-analyseBtn.addEventListener("click", runPipeline);
+processBtn.addEventListener("click", runBatch);
 
-function logStep(msg, cls = "") {
-  progressLog.classList.add("show");
-  const line = document.createElement("div");
-  line.className = cls;
-  line.textContent = msg;
-  progressLog.appendChild(line);
-  progressLog.scrollTop = progressLog.scrollHeight;
-}
+async function runBatch() {
+  reviewPanel.classList.remove("show");
+  batchProgress.classList.add("show");
+  batchSummary.classList.remove("show");
 
-async function runPipeline() {
-  analyseBtn.disabled = true;
-  progressLog.innerHTML = "";
-  progressLog.classList.add("show");
+  // Snapshot items so users can't modify mid-run
+  const queue = pendingItems.slice();
+  const results = [];
 
-  const lat = parseFloat(latInput.value);
-  const lon = parseFloat(lonInput.value);
-  const title = `upload_${Date.now()}`;
+  // Init log entries
+  batchLog.innerHTML = queue.map((item, i) =>
+    `<div class="row pending" data-id="${item.id}">
+       ⏸ ${i+1}/${queue.length} · ${item.file.name} — waiting
+     </div>`
+  ).join("");
 
-  try {
-    // 1 ── Upload to AGOL as Image item
-    logStep("1/5 Uploading image to AGOL…");
-    const itemId = await uploadAsImageItem(pendingFile, title);
-    logStep(`   ✓ Item created: ${itemId}`, "ok");
+  const setRow = (id, html, cls) => {
+    const row = batchLog.querySelector(`[data-id="${id}"]`);
+    if (row) {
+      row.innerHTML = html;
+      row.className = `row ${cls}`;
+    }
+  };
 
-    // 2 ── Share publicly so analyze_image can fetch it
-    logStep("2/5 Sharing image publicly…");
-    await shareItemPublic(itemId);
-    logStep("   ✓ Shared with Everyone", "ok");
+  let done = 0;
+  for (const item of queue) {
+    const coords = getEffectiveCoords(item);
+    const title = `upload_${Date.now()}_${item.id.split("_").pop()}`;
 
-    // 3 ── Call arcgis.ai analyze_image
-    logStep("3/5 Analysing with arcgis.ai…");
-    const aiResult = await analyzeImage(itemId);
-    const dominance = aiResult.overall.asian_paints_dominance_rating;
-    logStep(`   ✓ AP dominance: ${dominance}/10`, "ok");
+    progressText.textContent =
+      `Processing ${done + 1}/${queue.length} — ${item.file.name}`;
+    setRow(item.id, `🔄 ${done + 1}/${queue.length} · ${item.file.name} — uploading…`, "running");
 
-    // 4 ── Add feature row
-    logStep("4/5 Adding feature to layer…");
-    const newOid = await addFeature(title, lat, lon, aiResult);
-    logStep(`   ✓ Feature added (OID ${newOid})`, "ok");
+    try {
+      // 1 — upload
+      const itemId = await uploadAsImageItem(item.file, title);
+      setRow(item.id, `🔄 ${done + 1}/${queue.length} · ${item.file.name} — sharing…`, "running");
 
-    // 5 ── Attach image to feature
-    logStep("5/5 Attaching image…");
-    await attachImage(newOid, pendingFile);
-    logStep("   ✓ Image attached", "ok");
+      // 2 — share
+      await shareItemPublic(itemId);
+      setRow(item.id, `🔄 ${done + 1}/${queue.length} · ${item.file.name} — analysing…`, "running");
 
-    // Done
-    logStep("✅ Complete!", "ok");
-    addMsg(`✅ <b>Added new location</b><br>Title: ${title}<br>` +
-           `Coordinates: ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>` +
-           `AP Dominance: <b>${dominance}/10</b> · ` +
-           `${aiResult.overall.asian_paints_hoarding_count} AP / ` +
-           `${aiResult.overall.competitor_hoarding_count} competitor hoardings`,
-           "bot", true);
+      // 3 — analyse
+      const aiResult = await analyzeImage(itemId);
+      const dom = aiResult.overall.asian_paints_dominance_rating;
+      setRow(item.id, `🔄 ${done + 1}/${queue.length} · ${item.file.name} — saving…`, "running");
 
-    // Reset upload UI after a moment
-    setTimeout(() => {
-      previewWrap.classList.remove("show");
-      progressLog.classList.remove("show");
-      uploadPanel.classList.remove("open");
-      pendingFile = null; pendingGPS = null; fileInput.value = "";
-    }, 2000);
+      // 4 — add feature
+      const newOid = await addFeature(title, coords.lat, coords.lon, aiResult);
 
-  } catch (err) {
-    console.error(err);
-    logStep(`❌ Error: ${err.message || err}`, "err");
-    analyseBtn.disabled = false;
+      // 5 — attach
+      await attachImage(newOid, item.file);
+
+      setRow(item.id,
+        `✅ ${done + 1}/${queue.length} · ${item.file.name} — AP dominance ${dom}/10`,
+        "ok"
+      );
+      results.push({ ok: true, item, aiResult, title });
+
+    } catch (err) {
+      console.error(`Failed for ${item.file.name}:`, err);
+      setRow(item.id,
+        `❌ ${done + 1}/${queue.length} · ${item.file.name} — ${(err.message || err).substring(0, 80)}`,
+        "err"
+      );
+      results.push({ ok: false, item, error: err.message || String(err) });
+    }
+
+    done++;
+    progressBar.style.width = `${(done / queue.length) * 100}%`;
+  }
+
+  // ── Summary ─────────────────────────────────────────────────────────────
+  progressText.textContent = `Done — ${done}/${queue.length} processed`;
+
+  const ok    = results.filter(r => r.ok);
+  const fail  = results.filter(r => !r.ok);
+  const avgDom = ok.length
+    ? (ok.reduce((s, r) => s + (r.aiResult.overall.asian_paints_dominance_rating || 0), 0) / ok.length).toFixed(1)
+    : "N/A";
+  const totalAP   = ok.reduce((s, r) => s + (r.aiResult.overall.asian_paints_hoarding_count || 0), 0);
+  const totalComp = ok.reduce((s, r) => s + (r.aiResult.overall.competitor_hoarding_count   || 0), 0);
+
+  batchSummary.classList.add("show");
+  batchSummary.classList.toggle("has-errors", fail.length > 0);
+  batchSummary.innerHTML = `
+    <h5>${fail.length === 0 ? "✅" : "⚠️"} Batch complete</h5>
+    <div><b>${ok.length}</b> succeeded · <b>${fail.length}</b> failed</div>
+    ${ok.length > 0 ? `
+      <div style="margin-top:6px">
+        Average AP dominance: <b>${avgDom}/10</b><br>
+        Total AP hoardings detected: <b>${totalAP}</b><br>
+        Total competitor hoardings: <b>${totalComp}</b>
+      </div>` : ""}
+    ${fail.length > 0 ? `
+      <div style="margin-top:8px; color:#856404">
+        <b>Failed files:</b>
+        <ul style="margin:4px 0; padding-left:18px; font-size:11px">
+          ${fail.map(r => `<li>${r.item.file.name}: ${r.error}</li>`).join("")}
+        </ul>
+      </div>` : ""}
+    <div style="margin-top:8px">
+      <button class="btn-primary" style="padding:5px 12px" id="closeBatchBtn">Close</button>
+    </div>`;
+
+  document.getElementById("closeBatchBtn").addEventListener("click", () => {
+    pendingItems.forEach(p => URL.revokeObjectURL(p.thumbUrl));
+    pendingItems = [];
+    batchProgress.classList.remove("show");
+    batchSummary.classList.remove("show");
+    uploadPanel.classList.remove("open");
+    fileInput.value = "";
+  });
+
+  // Bot message in chat
+  if (ok.length > 0) {
+    addMsg(`✅ Added ${ok.length} new location(s) to the layer. ` +
+           `Click "Show all" to see them on the map.`, "bot");
+  }
+  if (fail.length > 0) {
+    addMsg(`⚠️ ${fail.length} upload(s) failed — see batch summary for details.`,
+           "bot");
   }
 }
 
