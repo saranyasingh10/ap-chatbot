@@ -425,13 +425,19 @@ async function runPipeline() {
 /* ── Step 1: Upload image as AGOL Image item ─────────────────────────────── */
 async function uploadAsImageItem(file, title) {
   const url = `${OAUTH_PORTAL_URL}/sharing/rest/content/users/${username}/addItem`;
+
+  // Give the file a unique filename so AGOL doesn't reject as duplicate
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const uniqueName = `${title}.${ext}`;
+  const uniqueFile = new File([file], uniqueName, { type: file.type });
+
   const fd = new FormData();
   fd.append("f", "json");
   fd.append("token", authToken);
   fd.append("title", title);
   fd.append("type", "Image");
   fd.append("tags", "asian-paints,hoarding,upload");
-  fd.append("file", file, file.name);
+  fd.append("file", uniqueFile, uniqueName);
 
   const r = await fetch(url, { method: "POST", body: fd });
   const data = await r.json();
