@@ -192,8 +192,7 @@ const FEATURE_LAYER_URL =
 const OAUTH_CLIENT_ID = "YJih6cL9vMIZVop8";
 const OAUTH_PORTAL_URL = "https://www.arcgis.com";   // change if you use Enterprise
 
-// Cloudflare Worker proxy that fronts aiutils.arcgis.com (bypasses browser CORS)
-// Paste the URL Cloudflare gives you after deploying cloudflare_worker.js
+// Cloudflare Worker proxy URL (fronts aiutils.arcgis.com to bypass browser CORS)
 const ANALYZE_PROXY_URL = "https://ap-analyze-proxy.saranyasingh10.workers.dev";
 /* ════════════════════════════════════════════════════════════════════════════ */
 
@@ -501,26 +500,33 @@ async function analyzeImage(itemId) {
 
   const imageUrl = `${OAUTH_PORTAL_URL}/sharing/rest/content/items/${itemId}/data`;
 
-  // Send to our Cloudflare Worker proxy.
-  // The proxy adds the Bearer header server-side (which browsers can't due to CORS)
-  // and returns the response with permissive CORS headers so the browser accepts it.
+  // POST to our Cloudflare Worker, which forwards to aiutils.arcgis.com
+  // using the exact body format the API expects (input + data array + inputCulture)
+  // and the correct X-Esri-Authorization header.
   const r = await fetch(ANALYZE_PROXY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       image:  imageUrl,
       prompt: ANALYSIS_PROMPT,
-      token:  authToken     // proxy moves this into Authorization: Bearer
+      token:  authToken
     })
   });
   const data = await r.json();
   if (!data.success) throw new Error("Analysis failed: " + JSON.stringify(data));
 
+  // Response shape (confirmed via SDK trace):
+  //   data.results[0].value  →  the LLM's raw text reply (string)
+  // We instructed the LLM to return JSON, so parse it now.
   let value = data.results[0].value;
-  // Sometimes value comes back as a string with markdown fences
   if (typeof value === "string") {
+    // Strip any accidental markdown fences just in case
     value = value.replace(/```json|```/g, "").trim();
-    value = JSON.parse(value);
+    try {
+      value = JSON.parse(value);
+    } catch (e) {
+      throw new Error("AI did not return valid JSON. Raw response: " + value.substring(0, 200));
+    }
   }
   return value;
 }
