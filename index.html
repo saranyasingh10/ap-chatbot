@@ -191,6 +191,10 @@ const FEATURE_LAYER_URL =
 
 const OAUTH_CLIENT_ID = "YJih6cL9vMIZVop8";
 const OAUTH_PORTAL_URL = "https://www.arcgis.com";   // change if you use Enterprise
+
+// Cloudflare Worker proxy that fronts aiutils.arcgis.com (bypasses browser CORS)
+// Paste the URL Cloudflare gives you after deploying cloudflare_worker.js
+const ANALYZE_PROXY_URL = "https://ap-analyze-proxy.saranyasingh10.workers.dev";
 /* ════════════════════════════════════════════════════════════════════════════ */
 
 /* ─── State ─── */
@@ -490,19 +494,24 @@ Respond ONLY as valid JSON, no markdown fences:
 `;
 
 async function analyzeImage(itemId) {
+  if (ANALYZE_PROXY_URL.startsWith("PASTE")) {
+    throw new Error("ANALYZE_PROXY_URL not configured. Deploy cloudflare_worker.js " +
+                    "and paste its URL into the CONFIG block at the top of this file.");
+  }
+
   const imageUrl = `${OAUTH_PORTAL_URL}/sharing/rest/content/items/${itemId}/data`;
 
-  // Use FormData — no custom headers means no CORS preflight
-  // Token goes in the body (standard ArcGIS REST pattern), not as Bearer header
-  const fd = new FormData();
-  fd.append("image",  imageUrl);
-  fd.append("prompt", ANALYSIS_PROMPT);
-  fd.append("token",  authToken);
-  fd.append("f",      "json");
-
-  const r = await fetch("https://aiutils.arcgis.com/api/image/analyze", {
+  // Send to our Cloudflare Worker proxy.
+  // The proxy adds the Bearer header server-side (which browsers can't due to CORS)
+  // and returns the response with permissive CORS headers so the browser accepts it.
+  const r = await fetch(ANALYZE_PROXY_URL, {
     method: "POST",
-    body: fd
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image:  imageUrl,
+      prompt: ANALYSIS_PROMPT,
+      token:  authToken     // proxy moves this into Authorization: Bearer
+    })
   });
   const data = await r.json();
   if (!data.success) throw new Error("Analysis failed: " + JSON.stringify(data));
