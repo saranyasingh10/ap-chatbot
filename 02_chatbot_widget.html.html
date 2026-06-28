@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asian Paints Hoarding Chatbot</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%;
+               font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+               background: #f7f8fa; color: #222; font-size: 14px; }
+  .chat { display: flex; flex-direction: column; height: 100vh; }
+
+  .header { background: #c8102e; color: #fff; padding: 12px 16px;
+            font-weight: 600; font-size: 15px; }
+  .header span { font-weight: 400; opacity: .85; font-size: 12px; margin-left: 8px; }
+
+  .messages { flex: 1; overflow-y: auto; padding: 12px 14px; }
+  .msg { margin-bottom: 10px; max-width: 88%; padding: 8px 12px;
+         border-radius: 12px; line-height: 1.4; font-size: 13px;
+         word-wrap: break-word; }
+  .msg.bot  { background: #fff; border: 1px solid #e2e6ea; }
+  .msg.user { background: #c8102e; color: #fff; margin-left: auto; text-align: right; }
+  .msg.sys  { background: #fff3cd; border: 1px solid #ffeeba; font-size: 12px; }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px;
+              border-top: 1px solid #e2e6ea; background: #fff; }
+  .pill { padding: 6px 10px; border-radius: 16px; background: #f0f2f5;
+          border: 1px solid #d6dae0; cursor: pointer; font-size: 12px;
+          transition: all .15s; }
+  .pill:hover { background: #c8102e; color: #fff; border-color: #c8102e; }
+
+  .input-row { display: flex; padding: 10px 12px; border-top: 1px solid #e2e6ea;
+               background: #fff; gap: 8px; }
+  .input-row input { flex: 1; padding: 8px 12px; border: 1px solid #d6dae0;
+                     border-radius: 6px; font-size: 13px; outline: none; }
+  .input-row input:focus { border-color: #c8102e; }
+  .input-row button { padding: 8px 16px; background: #c8102e; color: #fff;
+                      border: none; border-radius: 6px; cursor: pointer;
+                      font-weight: 500; font-size: 13px; }
+  .input-row button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .result-card { background: #fff; border: 1px solid #e2e6ea; border-radius: 8px;
+                 padding: 10px 12px; margin-top: 6px; }
+  .result-card b { color: #c8102e; }
+  .result-card ul { margin: 6px 0 0 18px; padding: 0; font-size: 12px; }
+  .result-card a { color: #0066cc; text-decoration: none; }
+  .result-card a:hover { text-decoration: underline; }
+
+  .thumb { display: block; max-width: 100%; max-height: 180px;
+           border-radius: 6px; margin-top: 8px; border: 1px solid #e2e6ea;
+           cursor: pointer; }
+  .thumb-loading { font-size: 11px; color: #888; font-style: italic;
+                   margin-top: 6px; }
+
+  /* Fullscreen image modal */
+  .modal { display: none; position: fixed; top: 0; left: 0;
+           width: 100%; height: 100%; background: rgba(0,0,0,0.85);
+           z-index: 999; justify-content: center; align-items: center;
+           cursor: pointer; }
+  .modal.show { display: flex; }
+  .modal img { max-width: 95%; max-height: 95%; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="chat">
+
+  <div class="header">
+    🎨 Asian Paints Assistant
+    <span>Ask about visibility, competitors, obstructions</span>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="msg bot">
+      Hi! I can help you find specific hoardings in the dataset.
+      Try a quick filter below, or type something like
+      <i>"show me low dominance stores in Pune"</i> or
+      <i>"where is Birla Opus winning?"</i>
+    </div>
+  </div>
+
+  <div class="pill-row">
+    <div class="pill" data-q="obstructed">🚧 Partially obstructed</div>
+    <div class="pill" data-q="low">📉 Low dominance (≤3)</div>
+    <div class="pill" data-q="high">📈 High dominance (≥7)</div>
+    <div class="pill" data-q="competitor">⚔️ Top competitors</div>
+    <div class="pill" data-q="ap_majority">✓ Where AP leads</div>
+    <div class="pill" data-q="all">🗺️ Show all</div>
+  </div>
+
+  <div class="input-row">
+    <input id="userInput" type="text" placeholder="Ask a question…"
+           autocomplete="off"/>
+    <button id="sendBtn">Send</button>
+  </div>
+</div>
+
+<!-- Fullscreen image preview -->
+<div class="modal" id="imgModal" onclick="this.classList.remove('show')">
+  <img id="modalImg" src="" alt="">
+</div>
+
+<script>
+/* ──────────────────────────────────────────────────────────────
+   CONFIG — fill this in
+   ──────────────────────────────────────────────────────────── */
+const FEATURE_LAYER_URL =
+  "https://services.arcgis.com/sO7sDAs7L98eYVX4/arcgis/rest/services/AP_Hoarding_Analysis/FeatureServer";
+// e.g. https://services.arcgis.com/abc123/arcgis/rest/services/AP_Hoarding_Analysis/FeatureServer/0
+/* ──────────────────────────────────────────────────────────── */
+
+const messagesEl = document.getElementById("messages");
+const inputEl    = document.getElementById("userInput");
+const sendBtn    = document.getElementById("sendBtn");
+const modalEl    = document.getElementById("imgModal");
+const modalImg   = document.getElementById("modalImg");
+
+// ── Chat UI helpers ─────────────────────────────────────────────
+function addMsg(text, who="bot", html=false) {
+  const div = document.createElement("div");
+  div.className = `msg ${who}`;
+  if (html) div.innerHTML = text;
+  else      div.textContent = text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+// ── Quick-filter rule engine ────────────────────────────────────
+const QUICK_QUERIES = {
+  obstructed: {
+    label: "Hoardings with obstructions",
+    where: "has_obstructions = 1",
+    intent: "obstructed"
+  },
+  low: {
+    label: "Stores where Asian Paints has LOW dominance (≤3)",
+    where: "ap_dominance <= 3",
+    intent: "low_dominance"
+  },
+  high: {
+    label: "Stores where Asian Paints DOMINATES (≥7)",
+    where: "ap_dominance >= 7",
+    intent: "high_dominance"
+  },
+  competitor: {
+    label: "Stores with competitor presence",
+    where: "comp_hoarding_count > 0",
+    intent: "competitor"
+  },
+  ap_majority: {
+    label: "Stores where AP outnumbers competitors",
+    where: "ap_hoarding_count > comp_hoarding_count",
+    intent: "ap_lead"
+  },
+  all: {
+    label: "All analysed locations",
+    where: "1=1",
+    intent: "all"
+  }
+};
+
+// ── Free-text NLP (lightweight rule-based parser) ───────────────
+function parseFreeText(text) {
+  const t = text.toLowerCase();
+
+  // Dominance signals
+  if (/(low|weak|poor|bad).{0,15}(dominance|presence|visibility)/.test(t) ||
+      /asian paints (is )?(losing|weak|absent)/.test(t)) {
+    return QUICK_QUERIES.low;
+  }
+  if (/(high|strong|good|dominat).{0,15}(dominance|presence|visibility)/.test(t) ||
+      /asian paints (is )?(winning|dominating|leading)/.test(t)) {
+    return QUICK_QUERIES.high;
+  }
+
+  // Obstruction
+  if (/(obstruct|block|hide|cover)/.test(t)) {
+    return QUICK_QUERIES.obstructed;
+  }
+
+  // Competitor focus
+  const brandMatch = t.match(/(berger|nerolac|kansai|dulux|birla opus|birla|jsw|nippon|indigo)/);
+  if (brandMatch) {
+    const brand = brandMatch[1];
+    return {
+      label: `Stores where ${brand} appears`,
+      where: `LOWER(brands_json) LIKE '%${brand.replace("'", "''")}%'`,
+      intent: "brand_search"
+    };
+  }
+  if (/competitor|other brand|rival/.test(t)) {
+    return QUICK_QUERIES.competitor;
+  }
+
+  // City / region (Mumbai lat ≥ 19.0, Pune lat < 19.0 in your dataset)
+  const cityMatch = t.match(/(mumbai|pune|delhi|bangalore|chennai|kolkata|hyderabad)/);
+  if (cityMatch) {
+    if (cityMatch[1] === "pune") {
+      return { label: "Pune locations", where: "lat < 19.0", intent: "city_pune" };
+    }
+    if (cityMatch[1] === "mumbai") {
+      return { label: "Mumbai locations", where: "lat >= 19.0", intent: "city_mumbai" };
+    }
+  }
+
+  // Default — show all
+  if (/^(show all|all|everything|reset)/.test(t)) {
+    return QUICK_QUERIES.all;
+  }
+
+  return null;
+}
+
+// ── Feature layer query ─────────────────────────────────────────
+async function queryLayer(whereClause) {
+  if (FEATURE_LAYER_URL.startsWith("PASTE")) {
+    return { error: "Feature layer URL is not configured yet." };
+  }
+  const url = `${FEATURE_LAYER_URL}/query?` + new URLSearchParams({
+    where: whereClause,
+    outFields: "OBJECTID,title,ap_dominance,ap_hoarding_count,comp_hoarding_count," +
+               "obstructed_count,top_competitor,dominance_band,lat,lon," +
+               "strengths,threats,recommendations",
+    returnGeometry: "false",
+    f: "json"
+  });
+  try {
+    const r = await fetch(url);
+    return await r.json();
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+// ── Fetch attachment metadata (gets the attachment ID) ──────────
+async function fetchAttachmentUrl(objectId) {
+  const url = `${FEATURE_LAYER_URL}/${objectId}/attachments?f=json`;
+  try {
+    const r = await fetch(url);
+    const data = await r.json();
+    if (data.attachmentInfos && data.attachmentInfos.length > 0) {
+      const attId = data.attachmentInfos[0].id;
+      return `${FEATURE_LAYER_URL}/${objectId}/attachments/${attId}`;
+    }
+    return null;
+  } catch (e) {
+    console.error("Attachment fetch failed:", e);
+    return null;
+  }
+}
+
+// ── Lazy-load thumbnail into a card ─────────────────────────────
+async function loadThumbnail(card, objectId) {
+  const placeholder = card.querySelector(".thumb-loading");
+  const attUrl = await fetchAttachmentUrl(objectId);
+  if (!attUrl) {
+    if (placeholder) placeholder.textContent = "(no image attached)";
+    return;
+  }
+  const img = document.createElement("img");
+  img.className = "thumb";
+  img.src = attUrl;
+  img.alt = "Store photo";
+  img.onclick = (e) => {
+    e.preventDefault();
+    modalImg.src = attUrl;
+    modalEl.classList.add("show");
+  };
+  if (placeholder) placeholder.replaceWith(img);
+  else card.appendChild(img);
+}
+
+// ── Render results ──────────────────────────────────────────────
+function renderResults(features, label) {
+  if (!features || features.length === 0) {
+    addMsg(`No locations match: <i>${label}</i>`, "bot", true);
+    return;
+  }
+
+  // Header message
+  addMsg(`<b>${features.length} location(s) match:</b> <i>${label}</i>`,
+         "bot", true);
+
+  // One card per feature so each can lazy-load its thumbnail
+  features.forEach(f => {
+    const a = f.attributes;
+    const domColour = a.ap_dominance >= 7 ? "#0a7c0a"
+                    : a.ap_dominance <= 3 ? "#c00" : "#d97706";
+
+    const cardHtml = `
+      <div class="result-card" data-oid="${a.OBJECTID}">
+        <b>📷 ${a.title}</b>
+        &nbsp;<span style="color:${domColour}">Dominance ${a.ap_dominance}/10</span><br>
+        <small>AP hoardings: ${a.ap_hoarding_count}
+               &nbsp;|&nbsp; Competitor: ${a.comp_hoarding_count}
+               ${a.obstructed_count > 0 ? `&nbsp;|&nbsp; 🚧 ${a.obstructed_count} obstructed` : ""}
+               ${a.top_competitor ? `&nbsp;|&nbsp; Top rival: <b>${a.top_competitor}</b>` : ""}
+        </small>
+        <div class="thumb-loading">Loading photo…</div>
+        <br><a href="#" onclick="zoomToFeature(${a.lon},${a.lat});return false">
+          📍 Zoom to location
+        </a>
+      </div>`;
+    const cardWrapper = addMsg(cardHtml, "bot", true);
+    const card = cardWrapper.querySelector(".result-card");
+    loadThumbnail(card, a.OBJECTID);
+  });
+
+  // Send filter signal to parent ExB app
+  postFilterToParent(features);
+}
+
+// ── Tell the parent ExB app to filter the map ───────────────────
+function postFilterToParent(features) {
+  const titles = features.map(f => f.attributes.title);
+  const whereClause = titles.length
+    ? `title IN (${titles.map(t => `'${t.replace("'","''")}'`).join(",")})`
+    : "1=0";
+
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({
+      type: "AP_FILTER",
+      where: whereClause,
+      titles: titles
+    }, "*");
+  }
+  window.location.hash = "filter=" + encodeURIComponent(whereClause);
+}
+
+function zoomToFeature(lon, lat) {
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: "AP_ZOOM", lon, lat, zoom: 18 }, "*");
+  }
+}
+
+// ── Handle a query (button or text) ─────────────────────────────
+async function handleQuery(query) {
+  let q = null;
+
+  if (typeof query === "string" && QUICK_QUERIES[query]) {
+    q = QUICK_QUERIES[query];
+    addMsg(q.label, "user");
+  } else {
+    addMsg(query, "user");
+    q = parseFreeText(query);
+    if (!q) {
+      addMsg("I didn't quite catch that. Try one of the quick filters below, " +
+             "or rephrase — e.g. <i>'low dominance in Pune'</i>, " +
+             "<i>'where is Birla Opus?'</i>, <i>'obstructed hoardings'</i>.",
+             "bot", true);
+      return;
+    }
+  }
+
+  addMsg(`🔍 Searching: ${q.label}…`, "sys");
+  const result = await queryLayer(q.where);
+
+  if (result.error) {
+    addMsg(`Error: ${result.error}`, "bot");
+    return;
+  }
+
+  renderResults(result.features || [], q.label);
+}
+
+// ── Wire up events ──────────────────────────────────────────────
+document.querySelectorAll(".pill").forEach(p =>
+  p.addEventListener("click", () => handleQuery(p.dataset.q))
+);
+sendBtn.addEventListener("click", () => {
+  const txt = inputEl.value.trim();
+  if (!txt) return;
+  inputEl.value = "";
+  handleQuery(txt);
+});
+inputEl.addEventListener("keydown", e => {
+  if (e.key === "Enter") sendBtn.click();
+});
+
+// Expose for inline onclick handlers
+window.zoomToFeature = zoomToFeature;
+</script>
+</body>
+</html>
