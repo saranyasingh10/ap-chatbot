@@ -486,17 +486,17 @@ Respond ONLY as valid JSON, no markdown fences:
 async function analyzeImage(itemId) {
   const imageUrl = `${OAUTH_PORTAL_URL}/sharing/rest/content/items/${itemId}/data`;
 
+  // Use FormData — no custom headers means no CORS preflight
+  // Token goes in the body (standard ArcGIS REST pattern), not as Bearer header
+  const fd = new FormData();
+  fd.append("image",  imageUrl);
+  fd.append("prompt", ANALYSIS_PROMPT);
+  fd.append("token",  authToken);
+  fd.append("f",      "json");
+
   const r = await fetch("https://aiutils.arcgis.com/api/image/analyze", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${authToken}`,
-      "x-esri-request-source": "AP-Chatbot"
-    },
-    body: JSON.stringify({
-      image: imageUrl,
-      prompt: ANALYSIS_PROMPT
-    })
+    body: fd
   });
   const data = await r.json();
   if (!data.success) throw new Error("Analysis failed: " + JSON.stringify(data));
